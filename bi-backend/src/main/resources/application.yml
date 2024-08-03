@@ -6,6 +6,11 @@ spring:
     url: jdbc:mysql://127.0.0.1:3306/bi
     username: root
     password: root
+  redis:
+    database: 0
+    host: localhost
+    port: 6379
+    password: root
 
 mybatis-plus:
   configuration:
@@ -24,7 +29,7 @@ springdoc:
       paths-to-match: '/**'
       packages-to-scan: com.lzf.bibackend
 
-# knife4j的增强配置，不需要增强可以不配
+# knife4j的增强配置
 knife4j:
   enable: true
   setting:
@@ -33,6 +38,13 @@ knife4j:
 openai:
   api:
     key: "70084fb3-e002-4301-8d37-6b5cf2750bc9"
-    end_point_id: "ep-20240801211603-5f56h"
+    endpoint-id: "ep-20240801211603-5f56h"
 #    url: "https://api.pumpkinaigc.online/v1/chat/completions"
 #    key: "sk-R6UYHcAEzcPIunSG5bAdEa64Bb21467cA8F506D30b0e10Df"
+
+thread-pool:
+  core-pool-size: 2
+  maximum-pool-size: 4
+  keep-alive-time: 100
+  work-queue-capacity: 100
+

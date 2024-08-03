@@ -20,7 +20,7 @@ import java.util.concurrent.TimeUnit;
 @Component
 public class AiClient {
 
-    @Value("${openai.api.end_point_id}")
+    @Value("${openai.api.endpoint-id}")
     private String endpointId;
 
     @Value("${openai.api.key}")

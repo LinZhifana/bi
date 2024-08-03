@@ -6,8 +6,10 @@ import com.lzf.bibackend.common.ErrorCode;
 import com.lzf.bibackend.common.ResultUtils;
 import com.lzf.bibackend.exception.BusinessException;
 import com.lzf.bibackend.manager.AiManager;
+import com.lzf.bibackend.manager.RedissonManager;
 import com.lzf.bibackend.model.dto.ai.DoChatRequest;
 import com.lzf.bibackend.model.dto.ai.DoChatResponse;
+import com.lzf.bibackend.model.entity.User;
 import com.lzf.bibackend.model.vo.AiVO;
 import com.lzf.bibackend.service.ChartService;
 import com.lzf.bibackend.service.UserService;
@@ -30,6 +32,12 @@ import java.util.List;
 public class ChartController {
     @Autowired
     private AiManager aiManager;
+
+    @Autowired
+    private RedissonManager redissonManager;
+
+    @Autowired
+    private UserService userService;
 
     @PostMapping("/generate")
     public BaseResponse<DoChatResponse> generateChartByAi(@RequestPart("file") MultipartFile multipartFile, @RequestPart("doChatRequest") DoChatRequest doChatRequest, HttpServletRequest request) {
@@ -57,10 +65,20 @@ public class ChartController {
         if (!validFileSuffixList.contains(suffix)) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "文件格式不对");
         }
-
+        // excel 转换
         String csvData = ExcelUtils.excelToCsv(multipartFile);
         doChatRequest.setData(csvData);
+
+        User loginUser = userService.getLoginUser(request);
+        String key = "generateChartByAi_" + loginUser.getId();
+        redissonManager.setupRateLimiter(key);
+        boolean triedAcquire = redissonManager.tryAcquire(key);
+        if (!triedAcquire) {
+            throw new BusinessException(ErrorCode.TOO_MANY_REQUEST, "请求次数过多");
+        }
+        // ai 处理
         DoChatResponse doChatResponse = aiManager.doChat(doChatRequest, request);
+
         return ResultUtils.success(doChatResponse);
     }
 }
