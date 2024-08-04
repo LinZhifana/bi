@@ -1,5 +1,6 @@
 import AddchartIcon from '@mui/icons-material/Addchart'
 import BarChartIcon from '@mui/icons-material/BarChart'
+import DataSaverOnIcon from '@mui/icons-material/DataSaverOn'
 import { create } from 'zustand'
 
 export const pageStore: pageEntry_t[] = [
@@ -12,6 +13,11 @@ export const pageStore: pageEntry_t[] = [
     name: 'My chart',
     to: '/my_chart',
     icon: <BarChartIcon />,
+  },
+  {
+    name: 'Add Batch Chart',
+    to: '/batch_chart',
+    icon: <DataSaverOnIcon />,
   },
 ]
 

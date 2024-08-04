@@ -15,6 +15,7 @@ import com.lzf.bibackend.model.dto.chart.ChartQueryRequest;
 import com.lzf.bibackend.model.entity.Chart;
 import com.lzf.bibackend.model.entity.User;
 import com.lzf.bibackend.model.vo.ChartVO;
+import com.lzf.bibackend.mq.MsgProducer;
 import com.lzf.bibackend.service.ChartService;
 import com.lzf.bibackend.service.UserService;
 import com.lzf.bibackend.utils.ExcelUtils;
@@ -45,32 +46,13 @@ public class ChartController {
     @Autowired
     private ChartService chartService;
 
+    @Autowired
+    private MsgProducer msgProducer;
+
     @PostMapping("/generate")
     public BaseResponse<DoChatResponse> generateChartByAi(@RequestPart("file") MultipartFile multipartFile, @RequestPart("doChatRequest") DoChatRequest doChatRequest, HttpServletRequest request) {
 
-        // 参数检验
-        if (StringUtils.isBlank(doChatRequest.getQuestion())) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR, "提问/目标为空");
-        }
-        if (StringUtils.isBlank(doChatRequest.getName()) || doChatRequest.getName().length() > 100) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR, "文件标题过长");
-        }
-        final long ONE_MB = 1024 * 1024;
-        if (multipartFile.getSize() > ONE_MB) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR, "文件超过1M");
-        }
-        String originalFilename = multipartFile.getOriginalFilename();
-        String suffix = "";
-        if (originalFilename != null && !originalFilename.isEmpty()) {
-            int index = originalFilename.lastIndexOf(".");
-            if (index > 0) {
-                suffix = originalFilename.substring(index + 1).toLowerCase();
-            }
-        }
-        final List<String> validFileSuffixList = Arrays.asList("xlsx", "xls");
-        if (!validFileSuffixList.contains(suffix)) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR, "文件格式不对");
-        }
+        checkGenerateChartParam(multipartFile, doChatRequest);
         // excel 转换
         String csvData = ExcelUtils.excelToCsv(multipartFile);
         doChatRequest.setData(csvData);
@@ -89,7 +71,7 @@ public class ChartController {
         Chart chart = new Chart();
 
         // ai 处理
-        DoChatResponse doChatResponse = aiManager.doChat(doChatRequest, request, chart.getId());
+        DoChatResponse doChatResponse = aiManager.doChat(doChatRequest, chart.getId());
 
         chart.setName(doChatRequest.getName());
         chart.setChartData(doChatRequest.getData());
@@ -136,5 +118,67 @@ public class ChartController {
             chartVOs.add(chartVO);
         }
         return ResultUtils.success(chartVOs);
+    }
+
+    @PostMapping("/generate/mq")
+    public BaseResponse<DoChatResponse> generateChartByAiMQ(@RequestPart("file") MultipartFile multipartFile, @RequestPart("doChatRequest") DoChatRequest doChatRequest, HttpServletRequest request) {
+        checkGenerateChartParam(multipartFile, doChatRequest);
+        // excel 转换
+        String csvData = ExcelUtils.excelToCsv(multipartFile);
+        doChatRequest.setData(csvData);
+        // 登录用户的id
+        User loginUser = userService.getLoginUser(request);
+        Long loginUserId = loginUser.getId();
+        // 限流
+        String key = "generateChartByAi_" + loginUserId;
+        redissonManager.setupRateLimiter(key);
+        boolean triedAcquire = redissonManager.tryAcquire(key);
+        if (!triedAcquire) {
+            throw new BusinessException(ErrorCode.TOO_MANY_REQUEST, "请求次数过多");
+        }
+
+        // 插入数据库
+        Chart chart = new Chart();
+        chart.setName(doChatRequest.getName());
+        chart.setChartData(doChatRequest.getData());
+        chart.setGoal(doChatRequest.getQuestion());
+        chart.setChartType(doChatRequest.getChatType());
+        chart.setStatus(ChartStatus.WAIT.getMessage());
+        chart.setUserId(loginUserId);
+        boolean saved = chartService.save(chart);
+        if(!saved){
+            throw  new BusinessException(ErrorCode.SYSTEM_ERROR, "设置WAIT状态出错");
+        }
+
+        msgProducer.send(String.valueOf(chart.getId()));
+        DoChatResponse doChatResponse = new DoChatResponse();
+        doChatResponse.setChartId(chart.getId());
+        return ResultUtils.success(doChatResponse);
+    }
+
+    private void checkGenerateChartParam(MultipartFile multipartFile, DoChatRequest doChatRequest) {
+        // 参数检验
+        if (StringUtils.isBlank(doChatRequest.getQuestion())) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "提问/目标为空");
+        }
+        if (StringUtils.isBlank(doChatRequest.getName()) || doChatRequest.getName().length() > 100) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "文件标题过长");
+        }
+        final long ONE_MB = 1024 * 1024;
+        if (multipartFile.getSize() > ONE_MB) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "文件超过1M");
+        }
+        String originalFilename = multipartFile.getOriginalFilename();
+        String suffix = "";
+        if (originalFilename != null && !originalFilename.isEmpty()) {
+            int index = originalFilename.lastIndexOf(".");
+            if (index > 0) {
+                suffix = originalFilename.substring(index + 1).toLowerCase();
+            }
+        }
+        final List<String> validFileSuffixList = Arrays.asList("xlsx", "xls");
+        if (!validFileSuffixList.contains(suffix)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "文件格式不对");
+        }
     }
 }

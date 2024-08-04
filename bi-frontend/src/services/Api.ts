@@ -330,5 +330,28 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
         type: ContentType.FormData,
         ...params,
       }),
+
+    /**
+     * No description
+     *
+     * @tags chart controller
+     * @name GenerateChartByAiMq
+     * @request POST:/chart/generate/mq
+     */
+    generateChartByAiMq: (
+      data: {
+        /** @format binary */
+        file: File;
+        doChatRequest: DoChatRequest;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<BaseResponseDoChatResponse, any>({
+        path: `/chart/generate/mq`,
+        method: "POST",
+        body: data,
+        type: ContentType.FormData,
+        ...params,
+      }),
   };
 }

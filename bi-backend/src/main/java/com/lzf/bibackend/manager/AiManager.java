@@ -21,7 +21,7 @@ public class AiManager {
     @Autowired
     private AiClient client;
 
-    public DoChatResponse doChat(DoChatRequest doChatRequest, HttpServletRequest httpServletRequest, Long chartId) throws BusinessException {
+    public DoChatResponse doChat(DoChatRequest doChatRequest, Long chartId) throws BusinessException {
         String content = client.doChat(doChatRequest);
         String[] contents = content.split("\\+\\+\\+\\+");
         if (contents.length < 3) {
