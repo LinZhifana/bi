@@ -1,7 +1,9 @@
 package com.lzf.bibackend.controller;
 
-import com.alibaba.excel.util.FileUtils;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.lzf.bibackend.common.BaseResponse;
+import com.lzf.bibackend.common.ChartStatus;
 import com.lzf.bibackend.common.ErrorCode;
 import com.lzf.bibackend.common.ResultUtils;
 import com.lzf.bibackend.exception.BusinessException;
@@ -9,20 +11,21 @@ import com.lzf.bibackend.manager.AiManager;
 import com.lzf.bibackend.manager.RedissonManager;
 import com.lzf.bibackend.model.dto.ai.DoChatRequest;
 import com.lzf.bibackend.model.dto.ai.DoChatResponse;
+import com.lzf.bibackend.model.dto.chart.ChartQueryRequest;
+import com.lzf.bibackend.model.entity.Chart;
 import com.lzf.bibackend.model.entity.User;
-import com.lzf.bibackend.model.vo.AiVO;
+import com.lzf.bibackend.model.vo.ChartVO;
 import com.lzf.bibackend.service.ChartService;
 import com.lzf.bibackend.service.UserService;
 import com.lzf.bibackend.utils.ExcelUtils;
-import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import org.apache.commons.lang3.StringUtils;
-import org.aspectj.util.FileUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -38,6 +41,9 @@ public class ChartController {
 
     @Autowired
     private UserService userService;
+
+    @Autowired
+    private ChartService chartService;
 
     @PostMapping("/generate")
     public BaseResponse<DoChatResponse> generateChartByAi(@RequestPart("file") MultipartFile multipartFile, @RequestPart("doChatRequest") DoChatRequest doChatRequest, HttpServletRequest request) {
@@ -68,17 +74,67 @@ public class ChartController {
         // excel 转换
         String csvData = ExcelUtils.excelToCsv(multipartFile);
         doChatRequest.setData(csvData);
-
+        // 登录用户的id
         User loginUser = userService.getLoginUser(request);
-        String key = "generateChartByAi_" + loginUser.getId();
+        Long loginUserId = loginUser.getId();
+        // 限流
+        String key = "generateChartByAi_" + loginUserId;
         redissonManager.setupRateLimiter(key);
         boolean triedAcquire = redissonManager.tryAcquire(key);
         if (!triedAcquire) {
             throw new BusinessException(ErrorCode.TOO_MANY_REQUEST, "请求次数过多");
         }
+
+        // 插入数据库
+        Chart chart = new Chart();
+
         // ai 处理
-        DoChatResponse doChatResponse = aiManager.doChat(doChatRequest, request);
+        DoChatResponse doChatResponse = aiManager.doChat(doChatRequest, request, chart.getId());
+
+        chart.setName(doChatRequest.getName());
+        chart.setChartData(doChatRequest.getData());
+        chart.setGoal(doChatRequest.getQuestion());
+        chart.setChartType(doChatRequest.getChatType());
+        chart.setGenChart(doChatResponse.getOption());
+        chart.setGenResult(doChatResponse.getMessage());
+        chart.setStatus(ChartStatus.SUCCEED.getMessage());
+        chart.setUserId(loginUserId);
+
+        boolean saved = chartService.save(chart);
+        if (!saved) {
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "图标保存失败");
+        }
 
         return ResultUtils.success(doChatResponse);
+    }
+
+    @PostMapping("/get_all")
+    public BaseResponse<List<ChartVO>> getAllByUid(@RequestBody ChartQueryRequest chartQueryRequest, HttpServletRequest request){
+        User loginUser = userService.getLoginUser(request);
+        Long loginUserId = loginUser.getId();
+
+        chartQueryRequest.setUserId(loginUserId);
+        QueryWrapper<Chart> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("user_id", loginUserId);
+        queryWrapper.eq("status", ChartStatus.SUCCEED);
+
+        Page<Chart> chartPage = new Page<>(chartQueryRequest.getPageNum(), chartQueryRequest.getPageSize());
+
+        Page<Chart> page = chartService.page(chartPage, queryWrapper);
+        List<Chart> charts = page.getRecords();
+        // chart 转换 chartVO
+        List<ChartVO> chartVOs = new ArrayList<>();
+        for(Chart chart : charts){
+            ChartVO chartVO = new ChartVO();
+
+            chartVO.setId(chart.getId());
+            chartVO.setChartType(chart.getChartType());
+            chartVO.setName(chart.getName());
+            chartVO.setGenChart(chart.getGenChart());
+            chartVO.setGenResult(chart.getGenResult());
+            chartVO.setGoal(chart.getGoal());
+            chartVOs.add(chartVO);
+        }
+        return ResultUtils.success(chartVOs);
     }
 }

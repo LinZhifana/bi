@@ -87,7 +87,7 @@ public class AiClient {
         sb.append("\n{csv格式的数据，用逗号分隔}\n");
         sb.append("请根据这两部分内容, 按照以下指定格式生成内容(此外不要输出任何多余的开头、结尾、注释)\n");
         sb.append("++++\n" +
-                "{前端 Echarts V5的option配置对象js代码，合理地将数据进行可视化，不要生成任何多余的内容，比如注释}\n" +
+                "{前端 Echarts V5的option配置对象js代码，使用双引号包裹属性名和字符串值，合理地将数据进行可视化，不要生成任何多余的内容，比如注释}\n" +
                 "++++\n");
         sb.append("输出要求: {Echarts V5的option配置对象JS代码} 数据分析结论: {详细的数据分析结论}");
         return sb.toString();

@@ -7,9 +7,6 @@ import CloudUploadIcon from '@mui/icons-material/CloudUpload'
 import {
   Alert,
   Button,
-  Card,
-  CardActionArea,
-  CardContent,
   FormControl,
   Grid,
   InputLabel,
@@ -21,11 +18,11 @@ import {
 } from '@mui/material'
 import { useState } from 'react'
 import MainComp from '../../../components/Main'
-import { DoChatRequest } from '../../../services/Api'
+import { ChartVO, DoChatRequest } from '../../../services/Api'
 import LoadingButton from '@mui/lab/LoadingButton'
 
 import { API } from '../../../services'
-import ReactECharts from 'echarts-for-react'
+import Dashboard from '../../../components/Dashboard'
 
 const VisuallyHiddenInput = styled('input')({
   clip: 'rect(0 0 0 0)',
@@ -45,51 +42,6 @@ const alertState = {
   param_error: 2,
   success: 3,
   fail: 4,
-}
-
-interface ChartCardProps {
-  option: string
-  message: string
-}
-
-const ChartCard: React.FC<ChartCardProps> = ({ option, message }) => {
-  const parse = (option: string) => {
-    if (option === '') return {}
-    const optObj = JSON.parse(option)
-
-    console.log(optObj)
-
-    if (!optObj) {
-      console.error('解析错误')
-      return {}
-    }
-
-    return optObj
-  }
-
-  return (
-    <Card sx={{ maxWidth: 1000 }}>
-      <CardActionArea>
-        <CardContent>
-          <Typography gutterBottom variant="h5" component="div">
-            图表
-          </Typography>
-          <ReactECharts
-            option={parse(option)}
-            style={{ height: 540, width: 960 }}
-          />
-        </CardContent>
-        <CardContent>
-          <Typography gutterBottom variant="h5" component="div">
-            结论
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            {message}
-          </Typography>
-        </CardContent>
-      </CardActionArea>
-    </Card>
-  )
 }
 
 const MainCard: React.FC = () => {
@@ -181,6 +133,16 @@ const MainCard: React.FC = () => {
     } finally {
       setLoading(false)
     }
+  }
+
+  const getChartVO = () => {
+    return {
+      name: name,
+      chartType: chartType,
+      goal: question,
+      genChart: option,
+      genResult: message,
+    } as ChartVO
   }
 
   return (
@@ -280,7 +242,9 @@ const MainCard: React.FC = () => {
         </Grid>
 
         <Grid item xs={12}>
-          <ChartCard option={option} message={message} />
+          {/* <ChartCard option={option} message={message} /> */}
+
+          <Dashboard {...getChartVO()} />
         </Grid>
       </Grid>
     </MainComp>

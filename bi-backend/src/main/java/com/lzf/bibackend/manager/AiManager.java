@@ -20,12 +20,8 @@ import java.io.IOException;
 public class AiManager {
     @Autowired
     private AiClient client;
-    @Autowired
-    ChartService chartService;
-    @Autowired
-    UserService userService;
 
-    public DoChatResponse doChat(DoChatRequest doChatRequest, HttpServletRequest httpServletRequest) throws BusinessException {
+    public DoChatResponse doChat(DoChatRequest doChatRequest, HttpServletRequest httpServletRequest, Long chartId) throws BusinessException {
         String content = client.doChat(doChatRequest);
         String[] contents = content.split("\\+\\+\\+\\+");
         if (contents.length < 3) {
@@ -35,24 +31,8 @@ public class AiManager {
         String option = contents[1].trim();
         String message = contents[2].trim();
 
-        // 插入数据库
-        Chart chart = new Chart();
-        chart.setName(doChatRequest.getName());
-        chart.setChartData(doChatRequest.getData());
-        chart.setGoal(doChatRequest.getQuestion());
-        chart.setChartType(doChatRequest.getChatType());
-        chart.setGenChart(option);
-        chart.setGenResult(message);
-        chart.setStatus(ChartStatus.SUCCEED.getMessage());
-        chart.setUserId(userService.getLoginUser(httpServletRequest).getId());
-
-        boolean saved = chartService.save(chart);
-        if (!saved) {
-            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "图标保存失败");
-        }
-
         DoChatResponse doChatResponse = new DoChatResponse();
-        doChatResponse.setChartId(chart.getId());
+        doChatResponse.setChartId(chartId);
         doChatResponse.setMessage(message);
         doChatResponse.setOption(option);
 

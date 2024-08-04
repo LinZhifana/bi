@@ -7,5 +7,4 @@ import com.lzf.bibackend.mapper.ChartMapper;
 import com.lzf.bibackend.service.ChartService;
 @Service
 public class ChartServiceImpl extends ServiceImpl<ChartMapper, Chart> implements ChartService{
-
 }
